@@ -1,10 +1,11 @@
 ### Ручные запросы к MCP-транспорту сервера (JetBrains HTTP Client / VS Code REST Client).
-### Адрес — из http-client.env.json; токен — access_token из POST /oauth/token, в http-client.private.env.json (не в git).
+### Адрес — из http-client.env.json. Токен: либо пройдите oauth.http (шаг 6 кладет его в accessToken),
+### либо впишите access_token в mcpToken в http-client.private.env.json (не в git).
 ### Сервер без сессий: каждый запрос независим, initialize перед вызовами не обязателен.
 
 ### Рукопожатие: имя сервера, версия, instructions
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -12,7 +13,7 @@ Accept: application/json, text/event-stream
 
 ### Список инструментов со схемами аргументов и ответов
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -20,7 +21,7 @@ Accept: application/json, text/event-stream
 
 ### Списки задач
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -28,7 +29,7 @@ Accept: application/json, text/event-stream
 
 ### Невыполненные задачи
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -36,7 +37,7 @@ Accept: application/json, text/event-stream
 
 ### Создать задачу в Inbox
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -44,7 +45,7 @@ Accept: application/json, text/event-stream
 
 ### Изменить задачу: сброс срока пустой строкой
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -52,7 +53,7 @@ Accept: application/json, text/event-stream
 
 ### Выполнить задачу
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 
@@ -60,7 +61,7 @@ Accept: application/json, text/event-stream
 
 ### Удалить задачу (отклоняется, пока есть живые теги или блокеры)
 POST {{mcpHost}}/
-Authorization: Bearer {{mcpToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Accept: application/json, text/event-stream
 

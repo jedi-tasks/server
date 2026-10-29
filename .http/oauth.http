@@ -1,0 +1,102 @@
+### Весь OAuth-пайплайн MCP руками, как его проходит клиент Claude (JetBrains HTTP Client).
+### Запускать сверху вниз. Переменные между шагами передаются через client.global.
+### Единственный ручной шаг — 5: открыть ссылку в браузере, войти и вставить code в шаг 6.
+
+### 1. Без токена — 401 с WWW-Authenticate: resource_metadata
+POST {{mcpHost}}/
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+
+> {%
+    client.test("401 с адресом метаданных", function() {
+        client.assert(response.status === 401, "ожидался 401");
+        client.assert(/resource_metadata=/.test(response.headers.valueOf("WWW-Authenticate")), "нет resource_metadata");
+    });
+%}
+
+### 2a. Метаданные защищенного ресурса (RFC 9728)
+GET {{mcpHost}}/.well-known/oauth-protected-resource
+
+> {%
+    client.global.set("authServer", response.body.authorization_servers[0]);
+%}
+
+### 2b. Метаданные Authorization Server (RFC 8414)
+GET {{authServer}}/.well-known/oauth-authorization-server
+
+> {%
+    client.global.set("registrationEndpoint", response.body.registration_endpoint);
+    client.global.set("authorizationEndpoint", response.body.authorization_endpoint);
+    client.global.set("tokenEndpoint", response.body.token_endpoint);
+%}
+
+### 3. Динамическая регистрация клиента (RFC 7591)
+POST {{registrationEndpoint}}
+Content-Type: application/json
+
+{"client_name":"HTTP Client","redirect_uris":["http://localhost:9999/cb"]}
+
+> {%
+    client.test("клиент зарегистрирован", function() { client.assert(response.status === 201, "ожидался 201"); });
+    client.global.set("clientId", response.body.client_id);
+%}
+
+### 4. PKCE: verifier и challenge = BASE64URL(SHA256(verifier)). Запрос фиктивный, нужен только скрипт
+< {%
+    const verifier = crypto.sha256().updateWithText(String(Math.random()) + Date.now()).digest().toHex();
+    const challenge = crypto.sha256().updateWithText(verifier).digest().toBase64(true);
+    client.global.set("codeVerifier", verifier);
+    client.global.set("codeChallenge", challenge);
+    client.global.set("state", String(Date.now()));
+%}
+GET {{mcpHost}}/.well-known/oauth-protected-resource
+
+### 5. Форма входа. Этот запрос вернет HTML — откройте тот же URL в браузере, войдите, нажмите «Разрешить».
+### Браузер уйдет на http://localhost:9999/cb?code=...&state=... — скопируйте code в переменную code (шаг 6).
+GET {{authorizationEndpoint}}?response_type=code&client_id={{clientId}}&redirect_uri=http://localhost:9999/cb&code_challenge={{codeChallenge}}&code_challenge_method=S256&state={{state}}&resource={{mcpHost}}
+
+### 6. Обмен кода на токены. Вставьте code из адресной строки браузера
+POST {{tokenEndpoint}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&code=ВСТАВЬТЕ_CODE&client_id={{clientId}}&redirect_uri=http://localhost:9999/cb&code_verifier={{codeVerifier}}&resource={{mcpHost}}
+
+> {%
+    client.test("токены выданы", function() {
+        client.assert(response.status === 200, "ожидался 200");
+        client.assert(response.body.token_type === "Bearer", "token_type");
+    });
+    client.global.set("accessToken", response.body.access_token);
+    client.global.set("refreshToken", response.body.refresh_token);
+%}
+
+### 7. Работа с MCP по access-токену
+POST {{mcpHost}}/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_task_lists","arguments":{}}}
+
+### 8. Обновление пары по refresh-токену (ротация: старый refresh перестает действовать через 5 минут)
+POST {{tokenEndpoint}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&refresh_token={{refreshToken}}
+
+> {%
+    client.global.set("accessToken", response.body.access_token);
+    client.global.set("refreshToken", response.body.refresh_token);
+%}
+
+### 9. Повторный обмен того же кода — invalid_grant (код одноразовый)
+POST {{tokenEndpoint}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&code=ВСТАВЬТЕ_CODE&client_id={{clientId}}&redirect_uri=http://localhost:9999/cb&code_verifier={{codeVerifier}}
+
+> {%
+    client.test("код сгорел", function() { client.assert(response.body.error === "invalid_grant", "ожидался invalid_grant"); });
+%}
