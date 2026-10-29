@@ -38,6 +38,7 @@ import (
 	auditLogRepository "server/internal/modules/auditLog/repository"
 	auditLogService "server/internal/modules/auditLog/service"
 	authEndpointGRPC "server/internal/modules/auth/endpoint/grpc"
+	authModel "server/internal/modules/auth/model"
 	authService "server/internal/modules/auth/service"
 	blockerEndpointGRPC "server/internal/modules/blocker/endpoint/grpc"
 	blockerRepository "server/internal/modules/blocker/repository"
@@ -222,6 +223,21 @@ func run() error {
 		auditLogService,
 		[]authService.DefaultsCreator{taskListService, priorityService, durationOptionService},
 	)
+
+	// Создаем начального пользователя из окружения, если его еще нет
+	if conf.Auth.InitialUser.Email != "" {
+		created, err := authService.EnsureUser(ctx, authModel.EnsureUserReq{
+			Name:     conf.Auth.InitialUser.Name,
+			Email:    conf.Auth.InitialUser.Email,
+			Password: conf.Auth.InitialUser.Password,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		if created {
+			log.Info("Создан начальный пользователь")
+		}
+	}
 
 	syncService := syncService.NewSyncService(
 		transactor,
