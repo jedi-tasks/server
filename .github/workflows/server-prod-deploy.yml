@@ -26,4 +26,6 @@ jobs:
       # Сервер живёт в кластере coin: SOPS-ключ и уведомления — общие секреты coin
       vault_sops_secret: ci/coin/helmfile-sops
       vault_notify_secret: ci/coin/deploy-notify
+      # kube-apiserver coin-1 доступен только через WireGuard
+      vault_wireguard_secret: ci/coin/wireguard-ci
     secrets: inherit
