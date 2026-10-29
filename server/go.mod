@@ -6,13 +6,11 @@ toolchain go1.24.3
 
 replace pkg => ../pkg
 
-replace github.com/jedi-tasks/go-server-grpc => ../../contracts/go-server-grpc-local
-
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/google/uuid v1.6.0
-	github.com/jedi-tasks/go-server-grpc v0.0.0
+	github.com/jedi-tasks/go-server-grpc v0.1.4
 	github.com/pressly/goose/v3 v3.22.1
 	github.com/prometheus/client_golang v1.20.5
 	go.opentelemetry.io/otel v1.34.0
