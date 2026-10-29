@@ -1,6 +1,8 @@
 name: dev deploy
 
 on:
+  # Ручной перезапуск деплоя без нового коммита
+  workflow_dispatch:
   push:
     branches:
       - release/*

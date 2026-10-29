@@ -1,6 +1,8 @@
 name: prod deploy
 
 on:
+  # Ручной перезапуск деплоя без нового коммита
+  workflow_dispatch:
   push:
     tags:
       - v*
