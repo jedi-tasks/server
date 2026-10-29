@@ -40,9 +40,9 @@ type Config struct {
 
 		// Пользователь, которого сервер создает при запуске, если его еще нет. Пустой email — не создавать
 		InitialUser struct {
-			Name     string `env:"AUTH_INITIAL_USER_NAME" envDefault:""`
-			Email    string `env:"AUTH_INITIAL_USER_EMAIL" envDefault:""`
-			Password string `env:"AUTH_INITIAL_USER_PASSWORD" envDefault:""`
+			Name     string `env:"AUTH_INITIAL_USER_NAME"`
+			Email    string `env:"AUTH_INITIAL_USER_EMAIL"`
+			Password string `env:"AUTH_INITIAL_USER_PASSWORD"`
 		}
 	}
 
