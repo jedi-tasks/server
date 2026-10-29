@@ -19,6 +19,7 @@ import (
 
 var tracer = otel.Tracer("/server/internal/modules/blocker/service")
 
+// BlockerService - сервис блокеров задач
 type BlockerService struct {
 	blockerRepository BlockerRepository
 	transactor        Transactor
@@ -60,12 +61,13 @@ type BlockerRepository interface {
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 
 	ResolveBlocker(ctx context.Context, id uuid.UUID, resolvedAt time.Time) (bool, error)
+	HasLiveBlockersForTask(ctx context.Context, taskID uuid.UUID) (bool, error)
 }
 
 var _ TaskService = new(taskService.TaskService)
 
 type TaskService interface {
-	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)

@@ -209,11 +209,11 @@ func run() error {
 	blockerService := blockerService.NewBlockerService(blockerRepository, transactor, auditLogService, userService, taskService)
 
 	// Сервисы, зависящие друг от друга по кругу, связываем после создания
-	// Задачи удаляются раньше разделов: иначе отвязка от раздела обновит их updated_at и удаление проиграет
-	taskListService.SetListContentsDeleters(taskService, listSectionService)
-	listSectionService.SetSectionDetacher(taskService)
-	priorityService.SetPriorityDetacher(taskService)
-	taskService.SetBlockerResolver(blockerService)
+	// Сервер ничего не удаляет каскадом: удаление отклоняется, пока на запись ссылаются живые строки
+	taskListService.SetListContentsCheckers(taskService, listSectionService)
+	listSectionService.SetLiveTasksChecker(taskService)
+	priorityService.SetLiveTasksChecker(taskService)
+	taskService.SetTaskLinksCheckers(tagService, blockerService)
 
 	authService := authService.NewAuthService(
 		userRepository,

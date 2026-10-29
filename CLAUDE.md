@@ -48,6 +48,10 @@ ssps, err := s.sspService.GetSSPsFromCache(ctx, req)
 ssps, err := s.sspRepository.FindSSPs(ctx, req)
 ```
 
+### Server Makes No Hidden Changes
+
+The server is only the central relay: a mutation changes exactly the rows the client sent, nothing else. No cascades (no deleting children, detaching references or resolving blockers on the server). Instead, a mutation is rejected with `errors.BadRequest` and a Russian `WithCustomHumanText` if afterwards a live row (`deleted_at IS NULL`) would reference a soft-deleted one. Checks run inside the mutation's transaction: a delete checks for live children after its UPDATE (the parent row is locked), a create/update locks referenced rows with `LockLive` (`FOR SHARE`). Rules and texts are listed in `README.md` («Правила целостности») — keep them in sync.
+
 ---
 
 ## Endpoint Layer

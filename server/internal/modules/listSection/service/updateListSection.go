@@ -22,13 +22,6 @@ func (s *ListSectionService) UpdateListSection(ctx context.Context, req model.Up
 		return err
 	}
 
-	// Проверяем доступ пользователя к связанной записи
-	if req.ListID != nil && *req.ListID != uuid.Nil {
-		if err := s.taskListService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.ListID}); err != nil {
-			return err
-		}
-	}
-
 	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
 
 		// Получаем запись для слепка "до" в аудит-логе
@@ -44,6 +37,13 @@ func (s *ListSectionService) UpdateListSection(ctx context.Context, req model.Up
 		updated, err := s.listSectionRepository.UpdateListSection(ctxTx, req)
 		if err != nil || !updated {
 			return 0, err
+		}
+
+		// Проверяем, что новый список доступен и не удален, и блокируем его от удаления до конца транзакции
+		if req.ListID != nil {
+			if err = s.taskListService.LockLive(ctxTx, req.Necessary.UserID, []uuid.UUID{*req.ListID}); err != nil {
+				return 0, err
+			}
 		}
 
 		// Получаем актуальную запись для слепка "после" в аудит-логе

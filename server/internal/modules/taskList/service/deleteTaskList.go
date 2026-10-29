@@ -12,8 +12,8 @@ import (
 	"server/internal/utils/errors"
 )
 
-// DeleteTaskList мягко удаляет список вместе с его разделами и задачами. Inbox удалить нельзя.
-// Удаление старее последнего изменения списка игнорируется
+// DeleteTaskList мягко удаляет список. Inbox удалить нельзя, список с неудаленными задачами или
+// разделами — тоже: сервер ничего не удаляет каскадом. Удаление старее последнего изменения игнорируется
 func (s *TaskListService) DeleteTaskList(ctx context.Context, req model.DeleteTaskListReq) error {
 	ctx, span := tracer.Start(ctx, "DeleteTaskList")
 	defer span.End()
@@ -42,8 +42,14 @@ func (s *TaskListService) DeleteTaskList(ctx context.Context, req model.DeleteTa
 			return 0, err
 		}
 
+		// Проверяем, что на список не ссылаются живые задачи и разделы. Проверка идет после удаления: строка
+		// списка уже заблокирована, поэтому параллельное создание задачи или раздела дождется этой транзакции
+		if err = s.checkNoLiveContents(ctxTx, req.ID); err != nil {
+			return 0, err
+		}
+
 		// Фиксируем удаление в аудит-логе
-		lastAuditLogID, err := s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
+		return s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
 			Entity:   auditLogEntity.TaskList,
 			Method:   auditLogMethod.Delete,
 			EntityID: req.ID.String(),
@@ -52,19 +58,5 @@ func (s *TaskListService) DeleteTaskList(ctx context.Context, req model.DeleteTa
 			UserID:   req.Necessary.UserID,
 			DeviceID: req.Necessary.DeviceID,
 		})
-		if err != nil {
-			return 0, err
-		}
-
-		// Удаляем разделы и задачи списка
-		for _, deleter := range s.listContentsDeleters {
-			auditLogID, err := deleter.DeleteByListID(ctxTx, req.Necessary, req.ID, req.UpdatedAt)
-			if err != nil {
-				return 0, err
-			}
-			lastAuditLogID = max(lastAuditLogID, auditLogID)
-		}
-
-		return lastAuditLogID, nil
 	})
 }

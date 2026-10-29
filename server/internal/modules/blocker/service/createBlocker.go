@@ -17,17 +17,6 @@ func (s *BlockerService) CreateBlocker(ctx context.Context, req model.CreateBloc
 	ctx, span := tracer.Start(ctx, "CreateBlocker")
 	defer span.End()
 
-	// Проверяем доступ пользователя к связанной записи
-	if err := s.taskService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{req.TaskID}); err != nil {
-		return err
-	}
-	// Проверяем доступ пользователя к связанной записи
-	if req.BlockingTaskID != nil && *req.BlockingTaskID != uuid.Nil {
-		if err := s.taskService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.BlockingTaskID}); err != nil {
-			return err
-		}
-	}
-
 	// Проверяем, что блокер не замыкает цепочку
 	if req.BlockingTaskID != nil {
 		if err := s.checkCycle(ctx, req.Necessary, req.TaskID, *req.BlockingTaskID); err != nil {
@@ -40,6 +29,15 @@ func (s *BlockerService) CreateBlocker(ctx context.Context, req model.CreateBloc
 		// Создаем запись. Повтор из офлайн-очереди ничего не создает и не пишет в аудит-лог
 		created, err := s.blockerRepository.CreateBlocker(ctxTx, req.ConvertToRepoReq())
 		if err != nil || !created {
+			return 0, err
+		}
+
+		// Проверяем, что задачи блокера доступны и не удалены, и блокируем их от удаления до конца транзакции
+		taskIDs := []uuid.UUID{req.TaskID}
+		if req.BlockingTaskID != nil {
+			taskIDs = append(taskIDs, *req.BlockingTaskID)
+		}
+		if err = s.taskService.LockLive(ctxTx, req.Necessary.UserID, taskIDs); err != nil {
 			return 0, err
 		}
 

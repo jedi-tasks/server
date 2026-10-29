@@ -19,6 +19,7 @@ import (
 
 var tracer = otel.Tracer("/server/internal/modules/tag/service")
 
+// TagService - сервис тегов и их связей с задачами
 type TagService struct {
 	tagRepository   TagRepository
 	transactor      Transactor
@@ -63,12 +64,15 @@ type TagRepository interface {
 	GetTasksToTags(context.Context, tagModel.GetTasksToTagsReq) ([]tagModel.TaskToTag, error)
 	AddTagToTask(ctx context.Context, userID, taskID, tagID uuid.UUID, updatedAt time.Time) (bool, error)
 	RemoveTagFromTask(ctx context.Context, taskID, tagID uuid.UUID, updatedAt time.Time) (bool, error)
+	LockLive(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	HasLiveLinks(ctx context.Context, column string, referenceID uuid.UUID) (bool, error)
 }
 
 var _ TaskService = new(taskService.TaskService)
 
 type TaskService interface {
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)

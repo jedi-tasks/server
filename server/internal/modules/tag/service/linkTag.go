@@ -20,19 +20,19 @@ func (s *TagService) AddTagToTask(ctx context.Context, req model.LinkTagReq) err
 	ctx, span := tracer.Start(ctx, "AddTagToTask")
 	defer span.End()
 
-	// Проверяем доступ пользователя к задаче и тегу
-	if err := s.taskService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{req.TaskID}); err != nil {
-		return err
-	}
-	if err := s.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{req.TagID}); err != nil {
-		return err
-	}
-
 	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
 
 		// Привязываем тег. Повтор из офлайн-очереди ничего не меняет и не пишет в аудит-лог
 		added, err := s.tagRepository.AddTagToTask(ctxTx, req.Necessary.UserID, req.TaskID, req.TagID, req.UpdatedAt)
 		if err != nil || !added {
+			return 0, err
+		}
+
+		// Проверяем, что задача и тег доступны и не удалены, и блокируем их от удаления до конца транзакции
+		if err = s.taskService.LockLive(ctxTx, req.Necessary.UserID, []uuid.UUID{req.TaskID}); err != nil {
+			return 0, err
+		}
+		if err = s.LockLive(ctxTx, req.Necessary.UserID, []uuid.UUID{req.TagID}); err != nil {
 			return 0, err
 		}
 

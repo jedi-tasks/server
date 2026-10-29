@@ -1,5 +1,5 @@
-// Смоук-тест запущенного сервера: регистрация, синк двух устройств, LWW, блокеры, теги, каскадное
-// удаление списка. Нужна открытая регистрация (AUTH_SIGN_UP_ENABLED=true).
+// Смоук-тест запущенного сервера: регистрация, синк двух устройств, LWW, блокеры, теги, правила
+// целостности при удалении (сервер ничего не удаляет каскадом — сначала дети, потом родитель). Нужна открытая регистрация (AUTH_SIGN_UP_ENABLED=true).
 //
 //	go run ./cmd/smoke -addr localhost:8081
 package main
@@ -40,6 +40,11 @@ func must[T interface{ GetError() *pb.Error }](res T, err error) T {
 		os.Exit(1)
 	}
 	return res
+}
+
+// rejected проверяет, что мутация отклонена с ожидаемым текстом для пользователя
+func rejected[T interface{ GetError() *pb.Error }](name string, res T, err error, humanText string) {
+	check(name, err == nil && res.GetError() != nil && res.GetError().Message == humanText, err, res.GetError())
 }
 
 func id() []byte                            { u := uuid.New(); return u[:] }
@@ -120,7 +125,7 @@ func main() {
 	got = must(tasks.GetTasks(ctx, &pb.GetTasksRequest{AccessToken: tokA, Ids: [][]byte{t1}}))
 	check("plannedDay and duration cleared", got.Tasks[0].PlannedDay == nil && got.Tasks[0].DurationMinutes == nil)
 
-	// Блокеры: t2 блокирует t1, цикл t1 -> t2 запрещен, выполнение t2 снимает блокер
+	// Блокеры: t2 блокирует t1, цикл t1 -> t2 запрещен. Выполнение t2 блокер не снимает — клиент снимает сам
 	t2 := id()
 	must(tasks.CreateTask(ctx, &pb.CreateTaskRequest{AccessToken: tokA, Id: t2, Title: "Заказать", CreatedAt: ts(now)}))
 	b1 := id()
@@ -129,23 +134,40 @@ func main() {
 	check("cycle rejected", err == nil && cr.Error != nil, cr.GetError())
 	must(tasks.SetTaskCompleted(ctx, &pb.SetTaskCompletedRequest{AccessToken: tokA, Id: t2, Completed: true, UpdatedAt: ts(now.Add(4 * time.Second))}))
 	bl := must(blockers.GetBlockers(ctx, &pb.GetBlockersRequest{AccessToken: tokA, TaskIDs: [][]byte{t1}}))
-	check("blocker auto-resolved", len(bl.Blockers) == 1 && bl.Blockers[0].ResolvedAt != nil)
+	check("blocker not resolved by server", len(bl.Blockers) == 1 && bl.Blockers[0].ResolvedAt == nil)
+	must(blockers.ResolveBlocker(ctx, &pb.ResolveBlockerRequest{AccessToken: tokA, Id: b1, UpdatedAt: ts(now.Add(4500 * time.Millisecond))}))
+	bl = must(blockers.GetBlockers(ctx, &pb.GetBlockersRequest{AccessToken: tokA, TaskIDs: [][]byte{t1}}))
+	check("blocker resolved by client", len(bl.Blockers) == 1 && bl.Blockers[0].ResolvedAt != nil)
+	dt, err := tasks.DeleteTask(ctx, &pb.DeleteTaskRequest{AccessToken: tokA, Id: t2, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("task with blocker can't be deleted", dt, err, "Задача участвует в блокерах — сначала удалите их")
 
 	// Теги
 	tg := id()
 	must(tags.CreateTag(ctx, &pb.CreateTagRequest{AccessToken: tokA, Id: tg, Name: "велосипед", UpdatedAt: ts(now)}))
 	must(tags.AddTagToTask(ctx, &pb.AddTagToTaskRequest{AccessToken: tokA, TaskID: t1, TagID: tg, UpdatedAt: ts(now.Add(5 * time.Second))}))
+	dtg, err := tags.DeleteTag(ctx, &pb.DeleteTagRequest{AccessToken: tokA, Id: tg, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("linked tag can't be deleted", dtg, err, "Тег привязан к задачам — сначала отвяжите его")
 
-	// Раздел и удаление списка каскадом
+	// Раздел и удаление списка: родитель с живыми детьми не удаляется, сначала удаляем детей
 	l := id()
 	must(lists.CreateTaskList(ctx, &pb.CreateTaskListRequest{AccessToken: tokA, Id: l, Name: "Работа", ColorHex: "#E5484D", Icon: "hammer.fill", SortOrder: 1, SortMode: pb.SortMode_Manual, CreatedAt: ts(now)}))
 	sec := id()
 	must(sections.CreateListSection(ctx, &pb.CreateListSectionRequest{AccessToken: tokA, Id: sec, ListID: l, Name: "Срочно", UpdatedAt: ts(now)}))
 	t3 := id()
 	must(tasks.CreateTask(ctx, &pb.CreateTaskRequest{AccessToken: tokA, Id: t3, ListID: l, SectionID: sec, Title: "Отчет", CreatedAt: ts(now)}))
-	dl, _ := lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: inboxID, UpdatedAt: ts(now.Add(time.Hour))})
-	check("inbox can't be deleted", dl.GetError() != nil)
-	must(lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: l, UpdatedAt: ts(now.Add(6 * time.Second))}))
+	dl, err := lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: inboxID, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("inbox can't be deleted", dl, err, "Inbox удалить нельзя")
+	dl, err = lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: l, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("list with tasks can't be deleted", dl, err, "В списке есть задачи — сначала удалите их или перенесите в другой список")
+	ds, err := sections.DeleteListSection(ctx, &pb.DeleteListSectionRequest{AccessToken: tokA, Id: sec, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("section with tasks can't be deleted", ds, err, "В разделе есть задачи — сначала удалите их или перенесите в другой раздел")
+	must(tasks.DeleteTask(ctx, &pb.DeleteTaskRequest{AccessToken: tokA, Id: t3, UpdatedAt: ts(now.Add(6 * time.Second))}))
+	dl, err = lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: l, UpdatedAt: ts(now.Add(time.Hour))})
+	rejected("list with sections can't be deleted", dl, err, "В списке есть разделы — сначала удалите их")
+	must(sections.DeleteListSection(ctx, &pb.DeleteListSectionRequest{AccessToken: tokA, Id: sec, UpdatedAt: ts(now.Add(7 * time.Second))}))
+	must(lists.DeleteTaskList(ctx, &pb.DeleteTaskListRequest{AccessToken: tokA, Id: l, UpdatedAt: ts(now.Add(8 * time.Second))}))
+	ct, err := tasks.CreateTask(ctx, &pb.CreateTaskRequest{AccessToken: tokA, Id: id(), ListID: l, Title: "В удаленный", CreatedAt: ts(now.Add(9 * time.Second))})
+	rejected("task in deleted list rejected", ct, err, "Список удалён — выберите другой список")
 
 	// Настройки
 	must(settings.UpdateSettings(ctx, &pb.UpdateSettingsRequest{AccessToken: tokA, DailyCapacityMinutes: ptr(uint32(300)), UpdatedAt: ts(now)}))
@@ -154,7 +176,7 @@ func main() {
 	sB = doSync(tokB, cpB)
 	check("B: task list deleted", len(sB.DeletedTaskListIDs) == 1, len(sB.DeletedTaskListIDs))
 	check("B: section deleted", len(sB.DeletedListSectionIDs) == 1, len(sB.DeletedListSectionIDs))
-	check("B: task in deleted list deleted", len(sB.DeletedTaskIDs) == 1, len(sB.DeletedTaskIDs))
+	check("B: task deleted before its list", len(sB.DeletedTaskIDs) == 1, len(sB.DeletedTaskIDs))
 	check("B: tag link added", len(sB.AddedTasksToTags) == 1, len(sB.AddedTasksToTags))
 	check("B: blocker resolved", len(sB.ChangedBlockers) == 1 && sB.ChangedBlockers[0].ResolvedAt != nil)
 	check("B: settings changed", sB.ChangedSettings != nil && sB.ChangedSettings.DailyCapacityMinutes == 300)
