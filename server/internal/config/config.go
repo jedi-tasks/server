@@ -22,6 +22,9 @@ type Config struct {
 	MCP struct {
 		// Токены доступа и их владельцы: "<токен>:<email>,<токен>:<email>". Пусто — MCP не запускается
 		Tokens string `env:"MCP_TOKENS"`
+		// Канонический публичный URL MCP без завершающего слэша, например https://mcp.tasks.bonavii.com.
+		// Он же issuer Authorization Server и resource для токенов
+		PublicURL string `env:"MCP_PUBLIC_URL"`
 	}
 
 	// Данные базы данных

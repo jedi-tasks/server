@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"pkg/gracefulShutdown"
@@ -59,6 +60,9 @@ import (
 	syncService "server/internal/modules/sync/service"
 
 	blockerEndpointMCP "server/internal/modules/blocker/endpoint/mcp"
+	oauthEndpointHTTP "server/internal/modules/oauth/endpoint/http"
+	oauthRepository "server/internal/modules/oauth/repository"
+	oauthService "server/internal/modules/oauth/service"
 	tagEndpointGRPC "server/internal/modules/tag/endpoint/grpc"
 	tagEndpointMCP "server/internal/modules/tag/endpoint/mcp"
 	tagRepository "server/internal/modules/tag/repository"
@@ -343,7 +347,20 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		mcpHTTPServer.All("/*", adaptor.HTTPHandler(mcpTransport.NewHandler(mcpServer, mcpAuthenticator)))
+		// Authorization Server OAuth 2.1 на том же хосте: /.well-known/* и /oauth/*, остальное — MCP
+		accessTokenTTL, err := time.ParseDuration(conf.Auth.AccessTokenTTL)
+		if err != nil {
+			return errors.InternalServer.Wrap(err)
+		}
+		oauthService := oauthService.NewOAuthService(
+			oauthRepository.NewOAuthRepository(pgsql),
+			authService,
+			oauthService.Config{PublicURL: conf.MCP.PublicURL, AccessTokenTTL: accessTokenTTL, Version: version},
+		)
+		mcpMux := http.NewServeMux()
+		oauthEndpointHTTP.NewOAuthEndpoint(oauthService).Register(mcpMux)
+		mcpMux.Handle("/", mcpTransport.NewHandler(mcpServer, mcpAuthenticator))
+		mcpHTTPServer.All("/*", adaptor.HTTPHandler(mcpMux))
 		httpServers = append(httpServers, mcpHTTPServer)
 	}
 
