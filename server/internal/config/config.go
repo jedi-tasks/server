@@ -30,6 +30,13 @@ type Config struct {
 
 		// Открыта ли регистрация новых пользователей
 		SignUpEnabled bool `env:"AUTH_SIGN_UP_ENABLED"`
+
+		// Пользователь, которого сервер создает при запуске, если его еще нет. Пустой email — не создавать
+		InitialUser struct {
+			Name     string `env:"AUTH_INITIAL_USER_NAME" envDefault:""`
+			Email    string `env:"AUTH_INITIAL_USER_EMAIL" envDefault:""`
+			Password string `env:"AUTH_INITIAL_USER_PASSWORD" envDefault:""`
+		}
 	}
 
 	ServiceName string `env:"SERVICE_NAME"`
