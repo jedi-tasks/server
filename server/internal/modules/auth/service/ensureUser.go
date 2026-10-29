@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"pkg/validator"
+	"server/internal/utils/validate"
 
 	"server/internal/modules/auth/model"
 	userModel "server/internal/modules/user/model"
@@ -19,7 +19,7 @@ func (s *AuthService) EnsureUser(ctx context.Context, req model.EnsureUserReq) (
 	defer span.End()
 
 	// Проверяем, что заданы все данные пользователя
-	if err = validator.Validate(req); err != nil {
+	if err = validate.Validate(ctx, req); err != nil {
 		return false, err
 	}
 

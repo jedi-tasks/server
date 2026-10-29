@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
-	"pkg/validator"
 	"server/internal/modules/tag/model"
 	"server/internal/utils/necessary"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -26,7 +26,7 @@ func (e *TagEndpoint) AddTagToTask(ctx context.Context, r *proto.AddTagToTaskReq
 	}
 
 	// Валидируем запрос
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 

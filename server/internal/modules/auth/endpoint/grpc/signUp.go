@@ -3,8 +3,8 @@ package grpc
 import (
 	"context"
 
-	"pkg/validator"
 	"server/internal/modules/auth/model"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -20,7 +20,7 @@ func (e *AuthEndpoint) SignUp(ctx context.Context, r *proto.SignUpRequest) (*pro
 	}
 
 	// Validate request
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 

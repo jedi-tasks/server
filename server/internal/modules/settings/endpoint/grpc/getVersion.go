@@ -2,8 +2,8 @@ package grpc
 
 import (
 	"context"
-	"pkg/validator"
 	"server/internal/modules/settings/model"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -19,7 +19,7 @@ func (e *SettingsEndpoint) GetVersion(ctx context.Context, r *proto.GetVersionRe
 	}
 
 	// Validate request
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 

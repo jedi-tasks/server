@@ -5,10 +5,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"pkg/validator"
 	"server/internal/modules/auth/model"
 	userModel "server/internal/modules/user/model"
 	userRepoModel "server/internal/modules/user/repository/model"
+	"server/internal/utils/validate"
 )
 
 // EnsureDevice создает устройство пользователя, если его еще нет. Нужен устройствам без входа по
@@ -19,7 +19,7 @@ func (s *AuthService) EnsureDevice(ctx context.Context, req model.EnsureDeviceRe
 	defer span.End()
 
 	// Валидируем запрос
-	if err = validator.Validate(req); err != nil {
+	if err = validate.Validate(ctx, req); err != nil {
 		return false, err
 	}
 

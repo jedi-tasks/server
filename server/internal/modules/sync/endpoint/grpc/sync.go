@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
-	"pkg/validator"
 	"server/internal/modules/sync/model"
 	"server/internal/utils/necessary"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -27,7 +27,7 @@ func (e *SyncEndpoint) Sync(ctx context.Context, r *proto.SyncRequest) (*proto.S
 	}
 
 	// Validate request
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 

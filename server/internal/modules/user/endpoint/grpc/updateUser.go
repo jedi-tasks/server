@@ -4,8 +4,8 @@ import (
 	"context"
 	"server/internal/utils/necessary"
 
-	"pkg/validator"
 	"server/internal/modules/user/model"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -26,7 +26,7 @@ func (e *UserEndpoint) UpdateUser(ctx context.Context, r *proto.UpdateUserReques
 	}
 
 	// Validate request
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 

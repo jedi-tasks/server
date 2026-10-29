@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
-	"pkg/validator"
 	"server/internal/modules/durationOption/model"
 	"server/internal/utils/necessary"
+	"server/internal/utils/validate"
 
 	proto "github.com/jedi-tasks/go-server-grpc/proto"
 )
@@ -26,7 +26,7 @@ func (e *DurationOptionEndpoint) DeleteDurationOption(ctx context.Context, r *pr
 	}
 
 	// Валидируем запрос
-	if err := validator.Validate(req); err != nil {
+	if err := validate.Validate(ctx, req); err != nil {
 		return res, err
 	}
 
