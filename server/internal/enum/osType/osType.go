@@ -15,15 +15,17 @@ const (
 	IPadOS  OSType = "iPadOS"
 	OSX     OSType = "OSX"
 	WatchOS OSType = "WatchOS"
+	Server  OSType = "server" // Устройство на стороне сервера, например MCP
 )
 
 // mappingProtoToModel содержит соответствие между значениями proto.OSType и OSType
 var mappingProtoToModel = map[proto.OSType]OSType{
-	proto.OSType_Android: Android,
-	proto.OSType_IOS:     IOS,
-	proto.OSType_IPadOS:  IPadOS,
-	proto.OSType_OSX:     OSX,
-	proto.OSType_WatchOS: WatchOS,
+	proto.OSType_Unspecified: Server,
+	proto.OSType_Android:     Android,
+	proto.OSType_IOS:         IOS,
+	proto.OSType_IPadOS:      IPadOS,
+	proto.OSType_OSX:         OSX,
+	proto.OSType_WatchOS:     WatchOS,
 }
 
 // ConvertToProto преобразует OSType в proto.OSType

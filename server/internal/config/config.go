@@ -15,6 +15,13 @@ type Config struct {
 		HTTP        string `env:"LISTEN_HTTP"`
 		ServiceHTTP string `env:"LISTEN_SERVICE_HTTP"`
 		GRPC        string `env:"LISTEN_GRPC"`
+		MCP         string `env:"LISTEN_MCP" envDefault:":8092"`
+	}
+
+	// MCP-слой для агентов: инструменты 1:1 к gRPC-методам
+	MCP struct {
+		// Токены доступа и их владельцы: "<токен>:<email>,<токен>:<email>". Пусто — MCP не запускается
+		Tokens string `env:"MCP_TOKENS" envDefault:""`
 	}
 
 	// Данные базы данных

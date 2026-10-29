@@ -72,6 +72,7 @@ import (
 	userRepository "server/internal/modules/user/repository"
 	userService "server/internal/modules/user/service"
 	"server/internal/utils/errors"
+	mcpTransport "server/internal/utils/mcp"
 	"server/internal/utils/syncNotifier"
 	pgsqlMigrations "server/migrations/pgsql"
 )
@@ -319,8 +320,38 @@ func run() error {
 	// Инициализируем эндпоинты
 	httpServer.Get("/version", middleware.NewVersionHandler(version, build, buildDate, hostname)) // GET /version
 
+	// Настраиваем MCP-сервер для агентов: отдельный порт, Bearer-токены из окружения.
+	// Без токенов не запускается. Инструменты регистрируют модули в своих endpoint/mcp
+	httpServers := []*fiber.App{httpServer, serviceHTTPServer}
+	mcpTokens, err := mcpTransport.ParseTokens(conf.MCP.Tokens)
+	if err != nil {
+		return err
+	}
+	var mcpHTTPServer *fiber.App
+	if !mcpTokens.IsEmpty() {
+		mcpServer := mcpTransport.NewServer(version)
+		mcpAuthenticator := mcpTransport.NewAuthenticator(mcpTokens, userService, authService, version)
+		mcpHTTPServer, err = fiber2.GetDefaultServer(conf.ServiceName, nil)
+		if err != nil {
+			return err
+		}
+		mcpHTTPServer.All("/*", adaptor.HTTPHandler(mcpTransport.NewHandler(mcpServer, mcpAuthenticator)))
+		httpServers = append(httpServers, mcpHTTPServer)
+	}
+
 	// Создаем wait группу
 	eg, ctx := errgroup.WithContext(ctx)
+
+	// Создаем горутину на запуск MCP-сервера
+	if mcpHTTPServer != nil {
+		eg.Go(func() error {
+			log.Info(fmt.Sprintf("MCP server is listening :%v", conf.Listen.MCP))
+			if err := mcpHTTPServer.Listen(conf.Listen.MCP); err != nil {
+				return errors.InternalServer.Wrap(err)
+			}
+			return nil
+		})
+	}
 
 	// Создаем горутину на запуск HTTP-сервера
 	eg.Go(func() error {
@@ -353,7 +384,7 @@ func run() error {
 	})
 
 	// Добавляем в группу горутину для graceful shutdown
-	gracefulShutdown.AddGracefulShutdownErrGroup(eg, ctx, []*fiber.App{httpServer, serviceHTTPServer}, []*grpc.Server{grpcServer})
+	gracefulShutdown.AddGracefulShutdownErrGroup(eg, ctx, httpServers, []*grpc.Server{grpcServer})
 
 	// Ждем завершения контекста или ошибок в горутинах
 	return eg.Wait()
