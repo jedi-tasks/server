@@ -41,7 +41,7 @@ func (s *OAuthService) ExchangeCode(ctx context.Context, req model.ExchangeCodeR
 	if req.RedirectURI != code.RedirectURI {
 		return model.TokenRes{}, model.NewOAuthError("invalid_grant", "redirect_uri does not match the code")
 	}
-	if req.Resource != "" && req.Resource != code.Resource {
+	if req.Resource != "" && !sameResource(req.Resource, code.Resource) {
 		return model.TokenRes{}, model.NewOAuthError("invalid_target", "resource does not match the code")
 	}
 

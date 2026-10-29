@@ -33,7 +33,7 @@ func (s *OAuthService) ValidateAuthorize(ctx context.Context, req model.Authoriz
 	if req.CodeChallenge == "" || req.CodeChallengeMethod != "S256" {
 		return client, model.NewOAuthError("invalid_request", "PKCE with code_challenge_method=S256 is required")
 	}
-	if req.Resource != "" && req.Resource != s.config.PublicURL {
+	if req.Resource != "" && !sameResource(req.Resource, s.config.PublicURL) {
 		return client, model.NewOAuthError("invalid_target", "resource must be "+s.config.PublicURL)
 	}
 

@@ -328,55 +328,46 @@ func run() error {
 	// Инициализируем эндпоинты
 	httpServer.Get("/version", middleware.NewVersionHandler(version, build, buildDate, hostname)) // GET /version
 
-	// Настраиваем MCP-сервер для агентов: отдельный порт, Bearer-токены из окружения.
-	// Без токенов не запускается. Инструменты регистрируют модули в своих endpoint/mcp
-	httpServers := []*fiber.App{httpServer, serviceHTTPServer}
-	mcpTokens, err := mcpTransport.ParseTokens(conf.MCP.Tokens)
+	// Настраиваем MCP-сервер для агентов: отдельный порт, авторизация по OAuth 2.1 — Authorization
+	// Server на том же хосте (/.well-known/*, /oauth/*), остальное — MCP с Bearer-JWT сервера.
+	// Инструменты регистрируют модули в своих endpoint/mcp
+	mcpServer := mcpTransport.NewServer(version)
+	taskEndpointMCP.Register(mcpServer, taskService)
+	taskListEndpointMCP.Register(mcpServer, taskListService)
+	tagEndpointMCP.Register(mcpServer, tagService)
+	blockerEndpointMCP.Register(mcpServer, blockerService)
+
+	accessTokenTTL, err := time.ParseDuration(conf.Auth.AccessTokenTTL)
+	if err != nil {
+		return errors.InternalServer.Wrap(err)
+	}
+	oauthService := oauthService.NewOAuthService(
+		oauthRepository.NewOAuthRepository(pgsql),
+		authService,
+		oauthService.Config{PublicURL: conf.MCP.PublicURL, AccessTokenTTL: accessTokenTTL, Version: version},
+	)
+	mcpMux := http.NewServeMux()
+	oauthEndpointHTTP.NewOAuthEndpoint(oauthService).Register(mcpMux)
+	mcpMux.Handle("GET "+mcpTransport.ResourceMetadataPath, mcpTransport.NewResourceMetadataHandler(conf.MCP.PublicURL))
+	mcpMux.Handle("GET "+mcpTransport.ResourceMetadataPath+"/", mcpTransport.NewResourceMetadataHandler(conf.MCP.PublicURL))
+	mcpMux.Handle("/", mcpTransport.NewHandler(mcpServer, conf.MCP.PublicURL))
+	mcpHTTPServer, err := fiber2.GetDefaultServer(conf.ServiceName, nil)
 	if err != nil {
 		return err
 	}
-	var mcpHTTPServer *fiber.App
-	if !mcpTokens.IsEmpty() {
-		mcpServer := mcpTransport.NewServer(version)
-		taskEndpointMCP.Register(mcpServer, taskService)
-		taskListEndpointMCP.Register(mcpServer, taskListService)
-		tagEndpointMCP.Register(mcpServer, tagService)
-		blockerEndpointMCP.Register(mcpServer, blockerService)
-		mcpAuthenticator := mcpTransport.NewAuthenticator(mcpTokens, userService, authService, version)
-		mcpHTTPServer, err = fiber2.GetDefaultServer(conf.ServiceName, nil)
-		if err != nil {
-			return err
-		}
-		// Authorization Server OAuth 2.1 на том же хосте: /.well-known/* и /oauth/*, остальное — MCP
-		accessTokenTTL, err := time.ParseDuration(conf.Auth.AccessTokenTTL)
-		if err != nil {
-			return errors.InternalServer.Wrap(err)
-		}
-		oauthService := oauthService.NewOAuthService(
-			oauthRepository.NewOAuthRepository(pgsql),
-			authService,
-			oauthService.Config{PublicURL: conf.MCP.PublicURL, AccessTokenTTL: accessTokenTTL, Version: version},
-		)
-		mcpMux := http.NewServeMux()
-		oauthEndpointHTTP.NewOAuthEndpoint(oauthService).Register(mcpMux)
-		mcpMux.Handle("/", mcpTransport.NewHandler(mcpServer, mcpAuthenticator))
-		mcpHTTPServer.All("/*", adaptor.HTTPHandler(mcpMux))
-		httpServers = append(httpServers, mcpHTTPServer)
-	}
+	mcpHTTPServer.All("/*", adaptor.HTTPHandler(mcpMux))
 
 	// Создаем wait группу
 	eg, ctx := errgroup.WithContext(ctx)
 
 	// Создаем горутину на запуск MCP-сервера
-	if mcpHTTPServer != nil {
-		eg.Go(func() error {
-			log.Info(fmt.Sprintf("MCP server is listening :%v", conf.Listen.MCP))
-			if err := mcpHTTPServer.Listen(conf.Listen.MCP); err != nil {
-				return errors.InternalServer.Wrap(err)
-			}
-			return nil
-		})
-	}
+	eg.Go(func() error {
+		log.Info(fmt.Sprintf("MCP server is listening :%v", conf.Listen.MCP))
+		if err := mcpHTTPServer.Listen(conf.Listen.MCP); err != nil {
+			return errors.InternalServer.Wrap(err)
+		}
+		return nil
+	})
 
 	// Создаем горутину на запуск HTTP-сервера
 	eg.Go(func() error {
@@ -409,7 +400,7 @@ func run() error {
 	})
 
 	// Добавляем в группу горутину для graceful shutdown
-	gracefulShutdown.AddGracefulShutdownErrGroup(eg, ctx, httpServers, []*grpc.Server{grpcServer})
+	gracefulShutdown.AddGracefulShutdownErrGroup(eg, ctx, []*fiber.App{httpServer, serviceHTTPServer, mcpHTTPServer}, []*grpc.Server{grpcServer})
 
 	// Ждем завершения контекста или ошибок в горутинах
 	return eg.Wait()

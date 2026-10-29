@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,4 +60,10 @@ func NewOAuthService(oauthRepository OAuthRepository, authService AuthService, c
 // PublicURL возвращает канонический URL MCP
 func (s *OAuthService) PublicURL() string {
 	return s.config.PublicURL
+}
+
+// sameResource сравнивает URL ресурса без учета завершающего слэша: клиенты передают адрес
+// сервера как ввел пользователь
+func sameResource(a, b string) bool {
+	return strings.TrimSuffix(a, "/") == strings.TrimSuffix(b, "/")
 }
