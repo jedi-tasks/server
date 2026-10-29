@@ -1,1 +1,4 @@
 .DS_Store
+
+# Токены для .http-запросов
+.http/http-client.private.env.json

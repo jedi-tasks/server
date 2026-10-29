@@ -1,0 +1,74 @@
+### Ручные запросы к MCP-транспорту сервера (JetBrains HTTP Client / VS Code REST Client).
+### Адрес и токен — из http-client.env.json (окружения) и http-client.private.env.json (токены, не в git).
+### Сервер без сессий: каждый запрос независим, initialize перед вызовами не обязателен.
+
+### Рукопожатие: имя сервера, версия, instructions
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"http-client","version":"0"}}}
+
+### Список инструментов со схемами аргументов и ответов
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+
+### Списки задач
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_task_lists","arguments":{}}}
+
+### Невыполненные задачи
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_tasks","arguments":{"completed":false}}}
+
+### Создать задачу в Inbox
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"create_task","arguments":{"title":"Проверка MCP","plannedDay":"2026-11-01"}}}
+
+### Изменить задачу: сброс срока пустой строкой
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"update_task","arguments":{"id":"{{taskId}}","plannedDay":""}}}
+
+### Выполнить задачу
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"set_task_completed","arguments":{"id":"{{taskId}}","completed":true}}}
+
+### Удалить задачу (отклоняется, пока есть живые теги или блокеры)
+POST {{mcpHost}}/
+Authorization: Bearer {{mcpToken}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"delete_task","arguments":{"id":"{{taskId}}"}}}
+
+### Без токена — 401
+POST {{mcpHost}}/
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":9,"method":"initialize","params":{}}
