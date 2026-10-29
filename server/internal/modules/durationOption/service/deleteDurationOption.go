@@ -1,0 +1,53 @@
+package service
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+
+	"server/internal/enum/auditLogEntity"
+	"server/internal/enum/auditLogMethod"
+	auditLogModel "server/internal/modules/auditLog/model"
+	"server/internal/modules/durationOption/model"
+)
+
+// DeleteDurationOption мягко удаляет запись. Удаление старее последнего изменения игнорируется
+func (s *DurationOptionService) DeleteDurationOption(ctx context.Context, req model.DeleteDurationOptionReq) error {
+	ctx, span := tracer.Start(ctx, "DeleteDurationOption")
+	defer span.End()
+
+	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
+		return s.deleteDurationOption(ctxTx, req)
+	})
+}
+
+// deleteDurationOption удаляет запись внутри уже открытой транзакции и возвращает идентификатор записи
+// аудит-лога (0, если удалять нечего)
+func (s *DurationOptionService) deleteDurationOption(ctxTx context.Context, req model.DeleteDurationOptionReq) (uint32, error) {
+
+	// Получаем запись для слепка "до" в аудит-логе. Уже удаленную повторно не удаляем
+	befores, err := s.durationOptionRepository.GetDurationOptions(ctxTx, model.GetDurationOptionsReq{ //nolint:exhaustruct
+		Necessary: req.Necessary,
+		IDs:       []uuid.UUID{req.ID},
+	})
+	if err != nil || len(befores) == 0 {
+		return 0, err
+	}
+
+	// Удаляем запись
+	deleted, err := s.durationOptionRepository.DeleteDurationOption(ctxTx, req.ID, req.UpdatedAt)
+	if err != nil || !deleted {
+		return 0, err
+	}
+
+	// Фиксируем удаление в аудит-логе
+	return s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
+		Entity:   auditLogEntity.DurationOption,
+		Method:   auditLogMethod.Delete,
+		EntityID: req.ID.String(),
+		Before:   befores[0],
+		After:    nil,
+		UserID:   req.Necessary.UserID,
+		DeviceID: req.Necessary.DeviceID,
+	})
+}

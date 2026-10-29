@@ -1,0 +1,30 @@
+name: lint
+
+on:
+  pull_request:
+#  push:
+
+permissions:
+  contents: read
+
+env:
+  DIRECTORY: server
+
+jobs:
+
+  golangci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+        # Настраиваем Go
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+        # Проверяем код линтером
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          working-directory: ${{ env.DIRECTORY }}
+          version: latest
