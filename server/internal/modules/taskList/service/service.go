@@ -14,18 +14,19 @@ import (
 	taskListRepoModel "server/internal/modules/taskList/repository/model"
 	"server/internal/modules/transactor"
 	userService "server/internal/modules/user/service"
-	"server/internal/utils/necessary"
 )
 
 var tracer = otel.Tracer("/server/internal/modules/taskList/service")
 
+// TaskListService - сервис списков задач
 type TaskListService struct {
 	taskListRepository TaskListRepository
 	transactor         Transactor
 	auditLogService    AuditLogService
 	userService        UserService
 
-	listContentsDeleters []ListContentsDeleter
+	liveTasksChecker    LiveTasksChecker
+	liveSectionsChecker LiveSectionsChecker
 }
 
 func NewTaskListService(
@@ -58,22 +59,29 @@ type TaskListRepository interface {
 	GetTaskLists(context.Context, taskListModel.GetTaskListsReq) ([]taskListModel.TaskList, error)
 
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 
 	CreateInbox(context.Context, taskListRepoModel.CreateTaskListReq) error
 	GetInboxID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 }
 
-// ListContentsDeleter - интерфейс сервиса, мягко удаляющего содержимое списка (разделы, задачи) внутри
-// открытой транзакции. Возвращает идентификатор последней записи аудит-лога (0, если удалять нечего).
-// Сервисы разделов и задач сами зависят от сервиса списков, поэтому подключаются после создания через
-// SetListContentsDeleters, а не через конструктор
-type ListContentsDeleter interface {
-	DeleteByListID(ctxTx context.Context, necessary necessary.NecessaryUserInformation, listID uuid.UUID, updatedAt time.Time) (uint32, error)
+// LiveTasksChecker - интерфейс сервиса задач, отвечающего, есть ли в списке неудаленные задачи.
+// Сервис задач сам зависит от сервиса списков, поэтому подключается после создания через
+// SetListContentsCheckers, а не через конструктор
+type LiveTasksChecker interface {
+	HasLiveTasksInList(ctx context.Context, listID uuid.UUID) (bool, error)
 }
 
-// SetListContentsDeleters подключает сервисы, удаляющие содержимое списка вместе с ним
-func (s *TaskListService) SetListContentsDeleters(deleters ...ListContentsDeleter) {
-	s.listContentsDeleters = deleters
+// LiveSectionsChecker - интерфейс сервиса разделов, отвечающего, есть ли в списке неудаленные разделы.
+// Подключается после создания через SetListContentsCheckers по той же причине
+type LiveSectionsChecker interface {
+	HasLiveSectionsInList(ctx context.Context, listID uuid.UUID) (bool, error)
+}
+
+// SetListContentsCheckers подключает проверки содержимого списка перед его удалением
+func (s *TaskListService) SetListContentsCheckers(liveTasksChecker LiveTasksChecker, liveSectionsChecker LiveSectionsChecker) {
+	s.liveTasksChecker = liveTasksChecker
+	s.liveSectionsChecker = liveSectionsChecker
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)

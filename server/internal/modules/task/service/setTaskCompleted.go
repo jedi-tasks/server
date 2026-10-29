@@ -13,8 +13,8 @@ import (
 	"server/internal/modules/task/model"
 )
 
-// SetTaskCompleted выполняет задачу или возвращает ее в работу. При выполнении снимаются блокеры,
-// ссылающиеся на эту задачу. Действие старее последнего изменения задачи игнорируется
+// SetTaskCompleted выполняет задачу или возвращает ее в работу. Блокеры, ссылающиеся на задачу, сервер
+// не трогает — клиент снимает их сам через ResolveBlocker. Действие старее последнего изменения игнорируется
 func (s *TaskService) SetTaskCompleted(ctx context.Context, req model.SetTaskCompletedReq) error {
 	ctx, span := tracer.Start(ctx, "SetTaskCompleted")
 	defer span.End()
@@ -55,7 +55,7 @@ func (s *TaskService) SetTaskCompleted(ctx context.Context, req model.SetTaskCom
 		}
 
 		// Фиксируем изменение в аудит-логе
-		lastAuditLogID, err := s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
+		return s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
 			Entity:   auditLogEntity.Task,
 			Method:   auditLogMethod.Update,
 			EntityID: req.ID.String(),
@@ -64,16 +64,5 @@ func (s *TaskService) SetTaskCompleted(ctx context.Context, req model.SetTaskCom
 			UserID:   req.Necessary.UserID,
 			DeviceID: req.Necessary.DeviceID,
 		})
-		if err != nil || !req.Completed || s.blockerResolver == nil {
-			return lastAuditLogID, err
-		}
-
-		// Снимаем блокеры, ссылающиеся на выполненную задачу
-		auditLogID, err := s.blockerResolver.ResolveByBlockingTask(ctxTx, req.Necessary, req.ID, req.UpdatedAt)
-		if err != nil {
-			return 0, err
-		}
-
-		return max(lastAuditLogID, auditLogID), nil
 	})
 }

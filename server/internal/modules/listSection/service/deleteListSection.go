@@ -9,9 +9,10 @@ import (
 	"server/internal/enum/auditLogMethod"
 	auditLogModel "server/internal/modules/auditLog/model"
 	"server/internal/modules/listSection/model"
+	"server/internal/utils/errors"
 )
 
-// DeleteListSection мягко удаляет запись. Удаление старее последнего изменения игнорируется
+// DeleteListSection мягко удаляет запись. Раздел с неудаленными задачами удалить нельзя. Удаление старее последнего изменения игнорируется
 func (s *ListSectionService) DeleteListSection(ctx context.Context, req model.DeleteListSectionReq) error {
 	ctx, span := tracer.Start(ctx, "DeleteListSection")
 	defer span.End()
@@ -40,8 +41,21 @@ func (s *ListSectionService) deleteListSection(ctxTx context.Context, req model.
 		return 0, err
 	}
 
+	// Проверяем, что на раздел не ссылаются живые задачи. Строка раздела уже заблокирована удалением,
+	// поэтому параллельный перенос задачи в раздел дождется этой транзакции
+	hasTasks, err := s.liveTasksChecker.HasLiveTasksInSection(ctxTx, req.ID)
+	if err != nil {
+		return 0, err
+	}
+	if hasTasks {
+		return 0, errors.BadRequest.New("List section has live tasks").
+			WithContextParams(ctxTx).
+			WithParams("SectionID", req.ID).
+			WithCustomHumanText("В разделе есть задачи — сначала удалите их или перенесите в другой раздел")
+	}
+
 	// Фиксируем удаление в аудит-логе
-	lastAuditLogID, err := s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
+	return s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
 		Entity:   auditLogEntity.ListSection,
 		Method:   auditLogMethod.Delete,
 		EntityID: req.ID.String(),
@@ -50,15 +64,4 @@ func (s *ListSectionService) deleteListSection(ctxTx context.Context, req model.
 		UserID:   req.Necessary.UserID,
 		DeviceID: req.Necessary.DeviceID,
 	})
-	if err != nil || s.sectionDetacher == nil {
-		return lastAuditLogID, err
-	}
-
-	// Задачи раздела остаются в списке без раздела
-	auditLogID, err := s.sectionDetacher.DetachSection(ctxTx, req.Necessary, req.ID, req.UpdatedAt)
-	if err != nil {
-		return 0, err
-	}
-
-	return max(lastAuditLogID, auditLogID), nil
 }

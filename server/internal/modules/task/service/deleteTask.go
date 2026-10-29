@@ -11,7 +11,7 @@ import (
 	"server/internal/modules/task/model"
 )
 
-// DeleteTask мягко удаляет запись. Удаление старее последнего изменения игнорируется
+// DeleteTask мягко удаляет запись. Задачу с привязанными тегами или блокерами удалить нельзя. Удаление старее последнего изменения игнорируется
 func (s *TaskService) DeleteTask(ctx context.Context, req model.DeleteTaskReq) error {
 	ctx, span := tracer.Start(ctx, "DeleteTask")
 	defer span.End()
@@ -37,6 +37,11 @@ func (s *TaskService) deleteTask(ctxTx context.Context, req model.DeleteTaskReq)
 	// Удаляем запись
 	deleted, err := s.taskRepository.DeleteTask(ctxTx, req.ID, req.UpdatedAt)
 	if err != nil || !deleted {
+		return 0, err
+	}
+
+	// Проверяем, что на задачу не ссылаются живые связи с тегами и блокеры
+	if err = s.checkNoLiveLinks(ctxTx, req.ID); err != nil {
 		return 0, err
 	}
 

@@ -26,28 +26,16 @@ func (s *TaskService) CreateTask(ctx context.Context, req model.CreateTaskReq) e
 		req.ListID = inboxID
 	}
 
-	// Проверяем доступ пользователя к списку
-	if err := s.taskListService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{req.ListID}); err != nil {
-		return err
-	}
-	// Проверяем доступ пользователя к связанной записи
-	if req.SectionID != nil && *req.SectionID != uuid.Nil {
-		if err := s.listSectionService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.SectionID}); err != nil {
-			return err
-		}
-	}
-	// Проверяем доступ пользователя к связанной записи
-	if req.PriorityID != nil && *req.PriorityID != uuid.Nil {
-		if err := s.priorityService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.PriorityID}); err != nil {
-			return err
-		}
-	}
-
 	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
 
 		// Создаем запись. Повтор из офлайн-очереди ничего не создает и не пишет в аудит-лог
 		created, err := s.taskRepository.CreateTask(ctxTx, req.ConvertToRepoReq())
 		if err != nil || !created {
+			return 0, err
+		}
+
+		// Проверяем, что связанные записи доступны и не удалены, и блокируем их от удаления
+		if err = s.lockReferences(ctxTx, req.Necessary.UserID, &req.ListID, req.SectionID, req.PriorityID); err != nil {
 			return 0, err
 		}
 

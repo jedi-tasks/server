@@ -17,16 +17,16 @@ func (s *ListSectionService) CreateListSection(ctx context.Context, req model.Cr
 	ctx, span := tracer.Start(ctx, "CreateListSection")
 	defer span.End()
 
-	// Проверяем доступ пользователя к связанной записи
-	if err := s.taskListService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{req.ListID}); err != nil {
-		return err
-	}
-
 	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
 
 		// Создаем запись. Повтор из офлайн-очереди ничего не создает и не пишет в аудит-лог
 		created, err := s.listSectionRepository.CreateListSection(ctxTx, req.ConvertToRepoReq())
 		if err != nil || !created {
+			return 0, err
+		}
+
+		// Проверяем, что список доступен и не удален, и блокируем его от удаления до конца транзакции
+		if err = s.taskListService.LockLive(ctxTx, req.Necessary.UserID, []uuid.UUID{req.ListID}); err != nil {
 			return 0, err
 		}
 

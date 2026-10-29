@@ -30,32 +30,6 @@ func (s *BlockerService) ResolveBlocker(ctx context.Context, req model.ResolveBl
 	})
 }
 
-// ResolveByBlockingTask снимает все живые блокеры, ссылающиеся на выполненную задачу, внутри открытой
-// транзакции выполнения задачи
-func (s *BlockerService) ResolveByBlockingTask(ctxTx context.Context, necessary necessary.NecessaryUserInformation, blockingTaskID uuid.UUID, resolvedAt time.Time) (lastAuditLogID uint32, err error) {
-	ctxTx, span := tracer.Start(ctxTx, "ResolveByBlockingTask")
-	defer span.End()
-
-	blockers, err := s.blockerRepository.GetBlockers(ctxTx, model.GetBlockersReq{ //nolint:exhaustruct
-		Necessary:       necessary,
-		BlockingTaskIDs: []uuid.UUID{blockingTaskID},
-		OnlyActive:      true,
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	for _, blocker := range blockers {
-		auditLogID, err := s.resolveBlocker(ctxTx, necessary, blocker.ID, resolvedAt)
-		if err != nil {
-			return 0, err
-		}
-		lastAuditLogID = max(lastAuditLogID, auditLogID)
-	}
-
-	return lastAuditLogID, nil
-}
-
 // resolveBlocker снимает блокер внутри открытой транзакции и фиксирует это в аудит-логе
 func (s *BlockerService) resolveBlocker(ctxTx context.Context, necessary necessary.NecessaryUserInformation, id uuid.UUID, resolvedAt time.Time) (uint32, error) {
 

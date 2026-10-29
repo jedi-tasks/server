@@ -22,25 +22,6 @@ func (s *TaskService) UpdateTask(ctx context.Context, req model.UpdateTaskReq) e
 		return err
 	}
 
-	// Проверяем доступ пользователя к связанной записи
-	if req.ListID != nil && *req.ListID != uuid.Nil {
-		if err := s.taskListService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.ListID}); err != nil {
-			return err
-		}
-	}
-	// Проверяем доступ пользователя к связанной записи
-	if req.SectionID != nil && *req.SectionID != uuid.Nil {
-		if err := s.listSectionService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.SectionID}); err != nil {
-			return err
-		}
-	}
-	// Проверяем доступ пользователя к связанной записи
-	if req.PriorityID != nil && *req.PriorityID != uuid.Nil {
-		if err := s.priorityService.CheckAccess(ctx, req.Necessary.UserID, []uuid.UUID{*req.PriorityID}); err != nil {
-			return err
-		}
-	}
-
 	return s.transactor.WithSyncGate(ctx, req.Necessary.UserID, req.Necessary.DeviceID, s.userService, s.auditLogService, func(ctxTx context.Context) (uint32, error) {
 
 		// Получаем запись для слепка "до" в аудит-логе
@@ -55,6 +36,11 @@ func (s *TaskService) UpdateTask(ctx context.Context, req model.UpdateTaskReq) e
 		// Изменяем запись
 		updated, err := s.taskRepository.UpdateTask(ctxTx, req)
 		if err != nil || !updated {
+			return 0, err
+		}
+
+		// Проверяем, что новые связанные записи доступны и не удалены, и блокируем их от удаления
+		if err = s.lockReferences(ctxTx, req.Necessary.UserID, req.ListID, req.SectionID, req.PriorityID); err != nil {
 			return 0, err
 		}
 

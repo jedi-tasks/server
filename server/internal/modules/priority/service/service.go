@@ -14,18 +14,18 @@ import (
 	priorityRepoModel "server/internal/modules/priority/repository/model"
 	"server/internal/modules/transactor"
 	userService "server/internal/modules/user/service"
-	"server/internal/utils/necessary"
 )
 
 var tracer = otel.Tracer("/server/internal/modules/priority/service")
 
+// PriorityService - сервис справочника приоритетов
 type PriorityService struct {
 	priorityRepository PriorityRepository
 	transactor         Transactor
 	auditLogService    AuditLogService
 	userService        UserService
 
-	priorityDetacher PriorityDetacher
+	liveTasksChecker LiveTasksChecker
 }
 
 func NewPriorityService(
@@ -58,6 +58,7 @@ type PriorityRepository interface {
 	GetPriorities(context.Context, priorityModel.GetPrioritiesReq) ([]priorityModel.Priority, error)
 
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)
@@ -77,13 +78,13 @@ type UserService interface {
 	BumpDeviceCheckpoint(ctx context.Context, userID uuid.UUID, deviceID string, auditLogID uint32) error
 }
 
-// PriorityDetacher - интерфейс сервиса задач, убирающего ссылку на удаленную запись внутри открытой транзакции.
-// Сервис задач сам зависит от этого сервиса, поэтому подключается после создания через SetPriorityDetacher
-type PriorityDetacher interface {
-	DetachPriority(ctxTx context.Context, necessary necessary.NecessaryUserInformation, id uuid.UUID, updatedAt time.Time) (uint32, error)
+// LiveTasksChecker - интерфейс сервиса задач, отвечающего, есть ли неудаленные задачи с приоритетом.
+// Сервис задач сам зависит от этого сервиса, поэтому подключается после создания через SetLiveTasksChecker
+type LiveTasksChecker interface {
+	HasLiveTasksWithPriority(ctx context.Context, priorityID uuid.UUID) (bool, error)
 }
 
-// SetPriorityDetacher подключает сервис задач
-func (s *PriorityService) SetPriorityDetacher(priorityDetacher PriorityDetacher) {
-	s.priorityDetacher = priorityDetacher
+// SetLiveTasksChecker подключает проверку задач с приоритетом перед его удалением
+func (s *PriorityService) SetLiveTasksChecker(liveTasksChecker LiveTasksChecker) {
+	s.liveTasksChecker = liveTasksChecker
 }

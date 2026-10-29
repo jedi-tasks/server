@@ -17,11 +17,11 @@ import (
 	taskListService "server/internal/modules/taskList/service"
 	"server/internal/modules/transactor"
 	userService "server/internal/modules/user/service"
-	"server/internal/utils/necessary"
 )
 
 var tracer = otel.Tracer("/server/internal/modules/task/service")
 
+// TaskService - сервис задач
 type TaskService struct {
 	taskRepository     TaskRepository
 	transactor         Transactor
@@ -31,7 +31,8 @@ type TaskService struct {
 	listSectionService ListSectionService
 	priorityService    PriorityService
 
-	blockerResolver BlockerResolver
+	liveTagLinksChecker LiveTagLinksChecker
+	liveBlockersChecker LiveBlockersChecker
 }
 
 func NewTaskService(
@@ -72,38 +73,45 @@ type TaskRepository interface {
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 
 	SetTaskCompleted(ctx context.Context, id uuid.UUID, completedAt *time.Time, updatedAt time.Time) (bool, error)
-	ClearReference(ctx context.Context, userID uuid.UUID, column string, refID uuid.UUID, updatedAt time.Time) ([]uuid.UUID, error)
+	LockLive(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	HasLiveTasks(ctx context.Context, column string, referenceID uuid.UUID) (bool, error)
 }
 
-// BlockerResolver - интерфейс сервиса блокеров, снимающего блокеры выполненной задачи внутри открытой
-// транзакции. Сервис блокеров сам зависит от сервиса задач, поэтому подключается после создания через
-// SetBlockerResolver, а не через конструктор
-type BlockerResolver interface {
-	ResolveByBlockingTask(ctxTx context.Context, necessary necessary.NecessaryUserInformation, blockingTaskID uuid.UUID, resolvedAt time.Time) (uint32, error)
+// LiveTagLinksChecker - интерфейс сервиса тегов, отвечающего, привязаны ли к задаче теги. Сервис тегов
+// сам зависит от сервиса задач, поэтому подключается после создания через SetTaskLinksCheckers
+type LiveTagLinksChecker interface {
+	HasLiveLinksForTask(ctx context.Context, taskID uuid.UUID) (bool, error)
 }
 
-// SetBlockerResolver подключает сервис блокеров
-func (s *TaskService) SetBlockerResolver(blockerResolver BlockerResolver) {
-	s.blockerResolver = blockerResolver
+// LiveBlockersChecker - интерфейс сервиса блокеров, отвечающего, участвует ли задача в блокерах.
+// Подключается после создания через SetTaskLinksCheckers по той же причине
+type LiveBlockersChecker interface {
+	HasLiveBlockersForTask(ctx context.Context, taskID uuid.UUID) (bool, error)
+}
+
+// SetTaskLinksCheckers подключает проверки связей задачи перед ее удалением
+func (s *TaskService) SetTaskLinksCheckers(liveTagLinksChecker LiveTagLinksChecker, liveBlockersChecker LiveBlockersChecker) {
+	s.liveTagLinksChecker = liveTagLinksChecker
+	s.liveBlockersChecker = liveBlockersChecker
 }
 
 var _ TaskListService = new(taskListService.TaskListService)
 
 type TaskListService interface {
-	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 	GetInboxID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 }
 
 var _ ListSectionService = new(listSectionService.ListSectionService)
 
 type ListSectionService interface {
-	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ PriorityService = new(priorityService.PriorityService)
 
 type PriorityService interface {
-	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)

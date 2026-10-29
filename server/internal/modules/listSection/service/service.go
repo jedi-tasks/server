@@ -15,11 +15,11 @@ import (
 	taskListService "server/internal/modules/taskList/service"
 	"server/internal/modules/transactor"
 	userService "server/internal/modules/user/service"
-	"server/internal/utils/necessary"
 )
 
 var tracer = otel.Tracer("/server/internal/modules/listSection/service")
 
+// ListSectionService - сервис разделов списков
 type ListSectionService struct {
 	listSectionRepository ListSectionRepository
 	transactor            Transactor
@@ -27,7 +27,7 @@ type ListSectionService struct {
 	userService           UserService
 	taskListService       TaskListService
 
-	sectionDetacher SectionDetacher
+	liveTasksChecker LiveTasksChecker
 }
 
 func NewListSectionService(
@@ -62,12 +62,14 @@ type ListSectionRepository interface {
 	GetListSections(context.Context, listSectionModel.GetListSectionsReq) ([]listSectionModel.ListSection, error)
 
 	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	HasLiveSectionsInList(ctx context.Context, listID uuid.UUID) (bool, error)
 }
 
 var _ TaskListService = new(taskListService.TaskListService)
 
 type TaskListService interface {
-	CheckAccess(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error
+	LockLive(ctxTx context.Context, userID uuid.UUID, ids []uuid.UUID) error
 }
 
 var _ AuditLogService = new(auditLogService.AuditLogService)
@@ -87,13 +89,13 @@ type UserService interface {
 	BumpDeviceCheckpoint(ctx context.Context, userID uuid.UUID, deviceID string, auditLogID uint32) error
 }
 
-// SectionDetacher - интерфейс сервиса задач, убирающего ссылку на удаленную запись внутри открытой транзакции.
-// Сервис задач сам зависит от этого сервиса, поэтому подключается после создания через SetSectionDetacher
-type SectionDetacher interface {
-	DetachSection(ctxTx context.Context, necessary necessary.NecessaryUserInformation, id uuid.UUID, updatedAt time.Time) (uint32, error)
+// LiveTasksChecker - интерфейс сервиса задач, отвечающего, есть ли в разделе неудаленные задачи.
+// Сервис задач сам зависит от этого сервиса, поэтому подключается после создания через SetLiveTasksChecker
+type LiveTasksChecker interface {
+	HasLiveTasksInSection(ctx context.Context, sectionID uuid.UUID) (bool, error)
 }
 
-// SetSectionDetacher подключает сервис задач
-func (s *ListSectionService) SetSectionDetacher(sectionDetacher SectionDetacher) {
-	s.sectionDetacher = sectionDetacher
+// SetLiveTasksChecker подключает проверку задач раздела перед его удалением
+func (s *ListSectionService) SetLiveTasksChecker(liveTasksChecker LiveTasksChecker) {
+	s.liveTasksChecker = liveTasksChecker
 }

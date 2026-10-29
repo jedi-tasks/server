@@ -9,9 +9,10 @@ import (
 	"server/internal/enum/auditLogMethod"
 	auditLogModel "server/internal/modules/auditLog/model"
 	"server/internal/modules/priority/model"
+	"server/internal/utils/errors"
 )
 
-// DeletePriority мягко удаляет запись. Удаление старее последнего изменения игнорируется
+// DeletePriority мягко удаляет запись. Приоритет неудаленных задач удалить нельзя. Удаление старее последнего изменения игнорируется
 func (s *PriorityService) DeletePriority(ctx context.Context, req model.DeletePriorityReq) error {
 	ctx, span := tracer.Start(ctx, "DeletePriority")
 	defer span.End()
@@ -40,8 +41,21 @@ func (s *PriorityService) deletePriority(ctxTx context.Context, req model.Delete
 		return 0, err
 	}
 
+	// Проверяем, что на приоритет не ссылаются живые задачи. Строка приоритета уже заблокирована
+	// удалением, поэтому параллельная смена приоритета задачи дождется этой транзакции
+	hasTasks, err := s.liveTasksChecker.HasLiveTasksWithPriority(ctxTx, req.ID)
+	if err != nil {
+		return 0, err
+	}
+	if hasTasks {
+		return 0, errors.BadRequest.New("Priority has live tasks").
+			WithContextParams(ctxTx).
+			WithParams("PriorityID", req.ID).
+			WithCustomHumanText("У приоритета есть задачи — сначала удалите их или смените им приоритет")
+	}
+
 	// Фиксируем удаление в аудит-логе
-	lastAuditLogID, err := s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
+	return s.auditLogService.TrackMutation(ctxTx, auditLogModel.TrackMutationReq{
 		Entity:   auditLogEntity.Priority,
 		Method:   auditLogMethod.Delete,
 		EntityID: req.ID.String(),
@@ -50,15 +64,4 @@ func (s *PriorityService) deletePriority(ctxTx context.Context, req model.Delete
 		UserID:   req.Necessary.UserID,
 		DeviceID: req.Necessary.DeviceID,
 	})
-	if err != nil || s.priorityDetacher == nil {
-		return lastAuditLogID, err
-	}
-
-	// Задачи с этим приоритетом становятся «не разобрано»
-	auditLogID, err := s.priorityDetacher.DetachPriority(ctxTx, req.Necessary, req.ID, req.UpdatedAt)
-	if err != nil {
-		return 0, err
-	}
-
-	return max(lastAuditLogID, auditLogID), nil
 }
