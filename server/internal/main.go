@@ -58,13 +58,17 @@ import (
 	syncEndpointGRPC "server/internal/modules/sync/endpoint/grpc"
 	syncService "server/internal/modules/sync/service"
 
+	blockerEndpointMCP "server/internal/modules/blocker/endpoint/mcp"
 	tagEndpointGRPC "server/internal/modules/tag/endpoint/grpc"
+	tagEndpointMCP "server/internal/modules/tag/endpoint/mcp"
 	tagRepository "server/internal/modules/tag/repository"
 	tagService "server/internal/modules/tag/service"
 	taskEndpointGRPC "server/internal/modules/task/endpoint/grpc"
+	taskEndpointMCP "server/internal/modules/task/endpoint/mcp"
 	taskRepository "server/internal/modules/task/repository"
 	taskService "server/internal/modules/task/service"
 	taskListEndpointGRPC "server/internal/modules/taskList/endpoint/grpc"
+	taskListEndpointMCP "server/internal/modules/taskList/endpoint/mcp"
 	taskListRepository "server/internal/modules/taskList/repository"
 	taskListService "server/internal/modules/taskList/service"
 	"server/internal/modules/transactor"
@@ -330,6 +334,10 @@ func run() error {
 	var mcpHTTPServer *fiber.App
 	if !mcpTokens.IsEmpty() {
 		mcpServer := mcpTransport.NewServer(version)
+		taskEndpointMCP.Register(mcpServer, taskService)
+		taskListEndpointMCP.Register(mcpServer, taskListService)
+		tagEndpointMCP.Register(mcpServer, tagService)
+		blockerEndpointMCP.Register(mcpServer, blockerService)
 		mcpAuthenticator := mcpTransport.NewAuthenticator(mcpTokens, userService, authService, version)
 		mcpHTTPServer, err = fiber2.GetDefaultServer(conf.ServiceName, nil)
 		if err != nil {
