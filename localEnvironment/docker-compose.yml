@@ -1,0 +1,16 @@
+### Стенд для локальной разработки
+version: '3.9'
+name: tasks
+services:
+  postgres:
+    image: postgres:latest
+    restart: on-failure
+    environment:
+      POSTGRES_MAX_CONNECTIONS: 1000
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./pgsql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "6133:5432"

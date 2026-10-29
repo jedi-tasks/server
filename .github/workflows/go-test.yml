@@ -1,0 +1,37 @@
+name: go-test
+
+on:
+  pull_request:
+#  push:
+
+env:
+  DIRECTORY: server
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+        # Настраиваем Go
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+          cache-dependency-path: server/go.sum
+
+        # Устанавливаем mockery
+      - name: Install mockery
+        run: go install github.com/vektra/mockery/v2@latest
+
+        # Генерируем моки
+      - name: Generate mocks
+        run: mockery
+
+        # Тестируем код
+      - name: Go test
+        run: |
+          cd ${{ env.DIRECTORY }}
+          go test -v ./...
