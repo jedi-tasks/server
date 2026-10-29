@@ -1,0 +1,27 @@
+name: prod deploy
+
+on:
+  push:
+    tags:
+      - v*
+
+# id-token — вход в Vault по GitHub OIDC в reusable-deploy
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  general-deploy-pipeline:
+    uses: bonavi/devops_common/.github/workflows/reusable-deploy.yml@main
+    with:
+      image_name: ${{ github.repository }}
+      make_command: deploy-tasks-server
+      devops_repository: finfix/devops
+      vault_role: gh-jedi-tasks-server-deploy-prod
+      vault_pat_secret: ci/jedi-tasks/github-pat
+      vault_kubeconfig_secret: ci/jedi-tasks/tasks-server-prod-kubeconfig
+      # Сервер живёт в кластере coin: SOPS-ключ и уведомления — общие секреты coin
+      vault_sops_secret: ci/coin/helmfile-sops
+      vault_notify_secret: ci/coin/deploy-notify
+    secrets: inherit
