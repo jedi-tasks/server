@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   general-deploy-pipeline:
-    uses: finfix/devops/.github/workflows/reusable-deploy.yml@main
+    uses: bonavi/devops_common/.github/workflows/reusable-deploy.yml@main
     with:
       image_name: ${{ github.repository }}
       make_command: deploy-tasks-server
