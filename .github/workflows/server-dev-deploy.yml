@@ -1,0 +1,26 @@
+name: dev deploy
+
+on:
+  push:
+    branches:
+      - release/*
+      - hotfix/*
+
+# id-token — вход в Vault по GitHub OIDC в reusable-deploy
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  general-deploy-pipeline:
+    uses: finfix/devops/.github/workflows/reusable-deploy.yml@main
+    with:
+      image_name: ${{ github.repository }}-dev
+      make_command: deploy-tasks-server-dev
+      devops_repository: finfix/devops
+      # Сервер живёт в кластере coin и берёт секреты проекта coin (vault/terraform в finfix/devops)
+      vault_role: gh-jedi-tasks-server-deploy-dev
+      vault_project: coin
+      vault_kubeconfig: coin-server-dev
+    secrets: inherit
