@@ -1,5 +1,5 @@
 ### Ручные запросы к MCP-транспорту сервера (JetBrains HTTP Client / VS Code REST Client).
-### Адрес и токен — из http-client.env.json (окружения) и http-client.private.env.json (токены, не в git).
+### Адрес — из http-client.env.json; токен — access_token из POST /oauth/token, в http-client.private.env.json (не в git).
 ### Сервер без сессий: каждый запрос независим, initialize перед вызовами не обязателен.
 
 ### Рукопожатие: имя сервера, версия, instructions
@@ -66,7 +66,13 @@ Accept: application/json, text/event-stream
 
 {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"delete_task","arguments":{"id":"{{taskId}}"}}}
 
-### Без токена — 401
+### Метаданные защищенного ресурса (RFC 9728): где Authorization Server
+GET {{mcpHost}}/.well-known/oauth-protected-resource
+
+### Метаданные Authorization Server (RFC 8414)
+GET {{mcpHost}}/.well-known/oauth-authorization-server
+
+### Без токена — 401 с WWW-Authenticate: resource_metadata
 POST {{mcpHost}}/
 Content-Type: application/json
 Accept: application/json, text/event-stream
