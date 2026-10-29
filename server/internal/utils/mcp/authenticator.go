@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"server/internal/enum/osType"
 	authModel "server/internal/modules/auth/model"
 	userModel "server/internal/modules/user/model"
 	"server/internal/utils/contextKeys"
@@ -86,7 +87,7 @@ func (a *Authenticator) userID(ctx context.Context, email string) (uuid.UUID, er
 		UserID:   userID,
 		DeviceID: DeviceID,
 		Device: userModel.DeviceInformation{ //nolint:exhaustruct
-			NameOS:     "server",
+			NameOS:     osType.Server,
 			VersionOS:  a.version,
 			DeviceName: "MCP",
 			ModelName:  "tasks-mcp",
