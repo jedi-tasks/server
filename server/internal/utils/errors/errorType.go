@@ -9,11 +9,11 @@ type Category int32
 
 const (
 	CategoryUnspecified        Category = iota // Категория не определена
-	CategoryInternal                            // Внутренняя ошибка сервера
-	CategoryNeedToLogout                        // Требуется разлогинить пользователя
-	CategoryNeedToSync                          // Требуется синхронизация устройства
-	CategoryOther                               // Прочие ошибки
-	CategoryNeedToRefreshToken                  // Требуется обновить access-токен
+	CategoryInternal                           // Внутренняя ошибка сервера
+	CategoryNeedToLogout                       // Требуется разлогинить пользователя
+	CategoryNeedToSync                         // Требуется синхронизация устройства
+	CategoryOther                              // Прочие ошибки
+	CategoryNeedToRefreshToken                 // Требуется обновить access-токен
 )
 
 // ErrorType - тип ошибки сервиса, расширяющий базовый тип ошибки категорией для клиента

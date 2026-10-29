@@ -110,8 +110,7 @@ func main() {
 
 	// LWW: B правит в 10:00+2s, A потом шлет более старую правку — игнорируется
 	must(tasks.UpdateTask(ctx, &pb.UpdateTaskRequest{AccessToken: tokB, Id: t1, Title: ptr("Новое"), UpdatedAt: ts(now.Add(2 * time.Second))}))
-	sA = doSync(tokA, cpA)
-	cpA = sA.PendingCheckpoint
+	doSync(tokA, cpA)
 	must(tasks.UpdateTask(ctx, &pb.UpdateTaskRequest{AccessToken: tokA, Id: t1, Title: ptr("Старое"), UpdatedAt: ts(now.Add(1 * time.Second))}))
 	got = must(tasks.GetTasks(ctx, &pb.GetTasksRequest{AccessToken: tokA, Ids: [][]byte{t1}}))
 	check("LWW keeps newer title", got.Tasks[0].Title == "Новое", got.Tasks[0].Title)

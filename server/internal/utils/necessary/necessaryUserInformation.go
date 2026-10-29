@@ -13,7 +13,7 @@ import (
 
 type NecessaryUserInformation struct {
 	UserID   uuid.UUID `json:"-" schema:"-" validate:"required" minimum:"1"` // Идентификатор пользователя
-	DeviceID string `json:"-" schema:"-" validate:"required"`             // Идентификатор устройства
+	DeviceID string    `json:"-" schema:"-" validate:"required"`             // Идентификатор устройства
 }
 
 func extractNecessaryFromCtx(ctx context.Context) (necessary NecessaryUserInformation, err error) {
