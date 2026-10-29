@@ -43,6 +43,9 @@ func (r *UserRepository) UpdateDevice(ctx context.Context, fields userRepoModel.
 	if fields.DeviceInformation.UserAgent != nil {
 		updates[deviceDDL.ColumnDeviceUserAgent] = *fields.DeviceInformation.UserAgent
 	}
+	if fields.DeviceInformation.Stateless != nil {
+		updates[deviceDDL.ColumnIsStateless] = *fields.DeviceInformation.Stateless
+	}
 	if fields.LastSyncedAuditLogID != nil {
 		updates[deviceDDL.ColumnLastSyncedAuditLogID] = *fields.LastSyncedAuditLogID
 	}

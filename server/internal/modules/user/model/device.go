@@ -15,6 +15,7 @@ type Device struct {
 	UserID                        uuid.UUID  `db:"user_id" json:"userID"`                      // Идентификатор пользователя девайса
 	DeviceID                      string     `db:"device_id" json:"deviceID"`                  // Идентификатор девайса
 	LastSyncedAuditLogID          uint32     `db:"last_synced_audit_log_id" json:"-"`          // Идентификатор последней подтвержденной (Confirm) записи аудит-лога
+	IsStateless                   bool       `db:"is_stateless" json:"isStateless"`            // Устройство без локальной копии данных: проверка синхронизации перед правками не нужна
 	PendingCheckpoint             *uint32    `db:"pending_checkpoint" json:"-"`                // Чекпоинт последнего Sync, ожидающий подтверждения
 	PendingSyncToken              *uuid.UUID `db:"pending_sync_token" json:"-"`                // Опорный токен последнего Sync
 	PreviousRefreshToken          *string    `db:"previous_refresh_token" json:"-"`            // Refresh-токен, действовавший до последней ротации

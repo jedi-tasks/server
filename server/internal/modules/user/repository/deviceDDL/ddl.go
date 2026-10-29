@@ -28,6 +28,7 @@ const (
 	ColumnPendingSyncToken              = "pending_sync_token"
 	ColumnPreviousRefreshToken          = "previous_refresh_token"
 	ColumnPreviousRefreshTokenExpiresAt = "previous_refresh_token_expires_at"
+	ColumnIsStateless                   = "is_stateless"
 )
 
 func WithPrefix(column string) string {

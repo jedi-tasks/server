@@ -45,6 +45,7 @@ func (s *AuthService) upsertDevice(ctx context.Context, device userModel.Device)
 				VersionOS: &device.DeviceInformation.VersionOS,
 				UserAgent: &device.DeviceInformation.UserAgent,
 				IPAddress: &device.DeviceInformation.IPAddress,
+				Stateless: &device.DeviceInformation.Stateless,
 			},
 		})
 	}

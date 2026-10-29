@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	userModel "server/internal/modules/user/model"
 	"time"
 
 	"github.com/google/uuid"
@@ -88,6 +89,6 @@ var _ UserService = new(userService.UserService)
 // UserService - интерфейс сервиса пользователей, используется для отсечения мутаций от
 // несинхронизированных устройств
 type UserService interface {
-	GetDeviceLastSyncedAuditLogIDForUpdate(ctx context.Context, userID uuid.UUID, deviceID string) (uint32, error)
+	GetDeviceSyncStateForUpdate(ctx context.Context, userID uuid.UUID, deviceID string) (userModel.DeviceSyncState, error)
 	BumpDeviceCheckpoint(ctx context.Context, userID uuid.UUID, deviceID string, auditLogID uint32) error
 }

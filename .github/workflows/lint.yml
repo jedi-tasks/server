@@ -22,7 +22,7 @@ jobs:
         # Настраиваем Go
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
         # Проверяем код линтером
       - name: golangci-lint

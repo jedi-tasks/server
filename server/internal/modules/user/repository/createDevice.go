@@ -30,6 +30,7 @@ func (r *UserRepository) CreateDevice(ctx context.Context, req userModel.Device)
 			deviceDDL.ColumnApplicationBundleID: req.ApplicationInformation.BundleID,
 			deviceDDL.ColumnApplicationVersion:  req.ApplicationInformation.Version,
 			deviceDDL.ColumnApplicationBuild:    req.ApplicationInformation.Build,
+			deviceDDL.ColumnIsStateless:         req.DeviceInformation.Stateless,
 		}),
 	)
 }

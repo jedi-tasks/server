@@ -14,6 +14,7 @@ type DeviceInformation struct {
 	ModelName  string        `json:"modelName" validate:"required" db:"device_model_name"` // Название модели
 	IPAddress  string        `json:"-" db:"device_ip_address"`                             // IP-адрес
 	UserAgent  string        `json:"-" db:"device_user_agent"`                             // UserAgent
+	Stateless  bool          `json:"stateless" db:"-"`                                     // Устройство без локальной копии данных
 }
 
 type ProtoDeviceInformation struct {
@@ -32,5 +33,6 @@ func (p ProtoDeviceInformation) ConvertToModel() (res DeviceInformation, err err
 		ModelName:  p.ModelName,
 		IPAddress:  "",
 		UserAgent:  "",
+		Stateless:  p.Stateless,
 	}, nil
 }

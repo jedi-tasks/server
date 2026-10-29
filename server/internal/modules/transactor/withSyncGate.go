@@ -2,6 +2,7 @@ package transactor
 
 import (
 	"context"
+	userModel "server/internal/modules/user/model"
 
 	"github.com/google/uuid"
 
@@ -10,7 +11,7 @@ import (
 
 // DeviceSyncGate - интерфейс доступа к чекпоинту устройства, необходимый для WithSyncGate
 type DeviceSyncGate interface {
-	GetDeviceLastSyncedAuditLogIDForUpdate(ctx context.Context, userID uuid.UUID, deviceID string) (uint32, error)
+	GetDeviceSyncStateForUpdate(ctx context.Context, userID uuid.UUID, deviceID string) (userModel.DeviceSyncState, error)
 	BumpDeviceCheckpoint(ctx context.Context, userID uuid.UUID, deviceID string, auditLogID uint32) error
 }
 
@@ -33,20 +34,24 @@ func (r *Transactor) WithSyncGate(
 ) error {
 	return r.WithinTransaction(ctx, func(ctxTx context.Context) error {
 
-		// Блокируем строку устройства до конца транзакции и читаем его чекпоинт
-		lastSyncedAuditLogID, err := deviceSyncGate.GetDeviceLastSyncedAuditLogIDForUpdate(ctxTx, userID, deviceID)
+		// Блокируем строку устройства до конца транзакции и читаем его состояние синхронизации
+		syncState, err := deviceSyncGate.GetDeviceSyncStateForUpdate(ctxTx, userID, deviceID)
 		if err != nil {
 			return err
 		}
 
-		// Отклоняем мутацию, если устройство не синхронизировано с последними изменениями
-		hasNewer, err := auditLogChangeChecker.HasAuditLogsSince(ctxTx, userID, lastSyncedAuditLogID)
-		if err != nil {
-			return err
-		}
-		if hasNewer {
-			return errors.NeedToSync.New("Устройство не синхронизировано с последними изменениями").
-				WithContextParams(ctxTx)
+		// Устройство с локальной копией данных должно увидеть чужие изменения до своей правки,
+		// иначе оно перезатрет их, не зная о них. Устройство без копии (MCP, веб) читает сервер
+		// перед каждой записью, для него проверка не нужна
+		if !syncState.IsStateless {
+			hasNewer, err := auditLogChangeChecker.HasAuditLogsSince(ctxTx, userID, syncState.LastSyncedAuditLogID)
+			if err != nil {
+				return err
+			}
+			if hasNewer {
+				return errors.NeedToSync.New("Устройство не синхронизировано с последними изменениями").
+					WithContextParams(ctxTx)
+			}
 		}
 
 		// Выполняем саму мутацию

@@ -53,6 +53,7 @@ func (p ProtoSignInReq) ConvertToModel() (res SignInReq, err error) {
 			ModelName:  p.Device.ModelName,
 			IPAddress:  p.Device.IpAddress,
 			UserAgent:  "",
+			Stateless:  p.Device.Stateless,
 		}
 	}
 
