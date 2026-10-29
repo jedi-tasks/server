@@ -21,11 +21,10 @@ jobs:
       make_command: deploy-tasks-server
       devops_repository: finfix/devops
       vault_role: gh-jedi-tasks-server-deploy-prod
-      vault_pat_secret: ci/jedi-tasks/github-pat
-      vault_kubeconfig_secret: ci/jedi-tasks/tasks-server-prod-kubeconfig
-      # Сервер живёт в кластере coin: SOPS-ключ и уведомления — общие секреты coin
-      vault_sops_secret: ci/coin/helmfile-sops
-      vault_notify_secret: ci/coin/deploy-notify
+      vault_pat_secret: jedi-tasks/ci/github-pat
+      vault_kubeconfig_secret: jedi-tasks/ci/tasks-server-prod-kubeconfig
+      # Сервер живёт в кластере coin: уведомления — общая инфраструктура кластера (infra)
+      vault_notify_secret: infra/ci/deploy-notify
       # kube-apiserver coin-1 доступен только через WireGuard
-      vault_wireguard_secret: ci/coin/wireguard-ci
+      vault_wireguard_secret: infra/ci/wireguard
     secrets: inherit
