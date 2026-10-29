@@ -19,8 +19,10 @@ jobs:
       image_name: ${{ github.repository }}-dev
       make_command: deploy-tasks-server-dev
       devops_repository: finfix/devops
-      # Сервер живёт в кластере coin и берёт секреты проекта coin (vault/terraform в finfix/devops)
       vault_role: gh-jedi-tasks-server-deploy-dev
-      vault_project: coin
-      vault_kubeconfig: coin-server-dev
+      vault_pat_secret: ci/jedi-tasks/github-pat
+      vault_kubeconfig_secret: ci/jedi-tasks/tasks-server-dev-kubeconfig
+      # Сервер живёт в кластере coin: SOPS-ключ и уведомления — общие секреты coin
+      vault_sops_secret: ci/coin/helmfile-sops
+      vault_notify_secret: ci/coin/deploy-notify
     secrets: inherit
