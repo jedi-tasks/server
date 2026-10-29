@@ -34,7 +34,5 @@
 docker compose -f localEnvironment/docker-compose.yml up -d
 ```
 
-Переменные окружения — в `server/internal/config/config.go` и `pkg/database/pgsql`. Пока CI контрактов не
-опубликовал `go-server-grpc`, сервер собирается на локальной генерации: в `server/go.mod` стоит
-`replace github.com/jedi-tasks/go-server-grpc => ../../contracts/go-server-grpc-local`
-(`make build-go` в `contracts`).
+Переменные окружения — в `server/internal/config/config.go` и `pkg/database/pgsql`. Сгенерированный код
+контрактов — модуль `github.com/jedi-tasks/go-server-grpc`, его публикует CI `contracts` по тегу `v*`.
