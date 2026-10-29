@@ -1,9 +1,7 @@
 package interceptor
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	pkgErrors "pkg/errors"
 	"pkg/log"
@@ -11,8 +9,6 @@ import (
 	"server/internal/utils/errors"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/encoding/protowire"
-	"google.golang.org/protobuf/proto"
 	_ "google.golang.org/protobuf/types/dynamicpb"
 
 	pb "github.com/jedi-tasks/go-server-grpc/proto"
@@ -93,43 +89,4 @@ func handleError(res any, err error) (any, error) {
 	}
 
 	return &pb.OnlyError{Error: protoErr}, nil
-}
-
-func setProtoError(protoErr *pb.Error, dest any) error {
-
-	res := map[string]any{"error": protoErr}
-
-	protoErrJSON, err := json.Marshal(res)
-	if err != nil {
-		return errors.InternalServer.Wrap(err)
-	}
-
-	err = json.Unmarshal(protoErrJSON, dest)
-	if err != nil {
-		return errors.InternalServer.Wrap(err)
-	}
-
-	return nil
-}
-
-// сериализуем error как вложенное поле с tag = 1
-func marshalErrorOnly(errorMsg *pb.Error) ([]byte, error) {
-	// Сначала маршалим сам error в []byte
-	errorBytes, err := proto.Marshal(errorMsg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Теперь вручную собираем message с полем 1 (тип: message)
-	var buf bytes.Buffer
-
-	// Записываем заголовок для поля 1 (тип = length-delimited = 2)
-	tag := protowire.EncodeTag(1, protowire.BytesType)
-	buf.Write(protowire.AppendVarint(nil, uint64(tag)))
-
-	// Записываем длину и значение вложенного сообщения
-	buf.Write(protowire.AppendVarint(nil, uint64(len(errorBytes))))
-	buf.Write(errorBytes)
-
-	return buf.Bytes(), nil
 }

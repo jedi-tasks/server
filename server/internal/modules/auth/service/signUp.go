@@ -59,12 +59,12 @@ func (s *AuthService) SignUp(ctx context.Context, loginData model.SignUpReq) (ac
 		// Создаем пользователя
 		datetimeCreate := time.Now()
 		err = s.userRepository.CreateUser(ctx, userModel.CreateReq{
-			ID:              accessData.ID,
-			Name:            loginData.Name,
-			Email:           loginData.Email,
-			PasswordHash:    passwordHash,
-			PasswordSalt:    userSalt,
-			TimeCreate:      datetimeCreate,
+			ID:           accessData.ID,
+			Name:         loginData.Name,
+			Email:        loginData.Email,
+			PasswordHash: passwordHash,
+			PasswordSalt: userSalt,
+			TimeCreate:   datetimeCreate,
 		})
 		if err != nil {
 			return err

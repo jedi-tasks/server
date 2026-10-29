@@ -13,30 +13,6 @@ type RefreshTokensReq struct {
 	Device      userModel.DeviceInformation      `json:"device"`                    // Информация о девайсе
 }
 
-func (req *RefreshTokensReq) ConvertToProto() (res proto.RefreshTokensRequest, err error) {
-
-	nameOS, err := req.Device.NameOS.ConvertToProto()
-	if err != nil {
-		return res, err
-	}
-
-	return proto.RefreshTokensRequest{
-		Token: req.Token,
-		Application: &proto.ApplicationInformation{
-			BundleID: req.Application.BundleID,
-			Version:  req.Application.Version,
-			Build:    req.Application.Build,
-		},
-		Device: &proto.DeviceInformation{
-			NameOS:     nameOS,
-			VersionOS:  req.Device.VersionOS,
-			DeviceName: req.Device.DeviceName,
-			ModelName:  req.Device.ModelName,
-			IpAddress:  req.Device.IPAddress,
-		},
-	}, nil
-}
-
 // ProtoRefreshTokensReq wrapper for proto request
 type ProtoRefreshTokensReq struct {
 	*proto.RefreshTokensRequest
